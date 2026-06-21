@@ -1,0 +1,10 @@
+Adversarially review the design spec below. Hunt for: gaps, ambiguities, missing
+edge cases, unhandled error paths, security weaknesses, weak or untestable
+acceptance criteria, and missing non-functional requirements (rate limits, token
+expiry, logging, enumeration, concurrency, etc.). Report every distinct issue.
+
+OUTPUT FORMAT — one block per finding, nothing else:
+## Finding F<n>
+Section: <which part of the spec>
+Severity: <low|med|high>
+Issue: <what's missing/wrong and the fix>

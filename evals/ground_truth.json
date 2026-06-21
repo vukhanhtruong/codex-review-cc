@@ -1,0 +1,40 @@
+{
+  "_comment": "Ground-truth planted issues for the codex-review eval harness. Each `signal` is a case-insensitive regex; a planted issue counts as CAUGHT when any reviewer finding's text matches it. Add `\"gating\": false` to an issue that is too marginal/low-severity to reliably catch (e.g. a nit the reviewer's calibration may correctly drop) — it's still reported but a miss does not fail the run. Edit/extend cases here; run-evals.sh reads this file.",
+  "code_cases": [
+    {
+      "name": "tc1-user-search",
+      "fixture": "tc1-user-search",
+      "target": "app.py",
+      "branch": "feature/user-search",
+      "expect_verdict": "CHANGES_REQUESTED",
+      "planted": [
+        {"id": "G1", "lens": "security", "desc": "SQL injection via f-string interpolation", "signal": "inject|interpolat|parameter|LIKE \\?|f-string|format string"},
+        {"id": "G2", "lens": "correctness", "desc": "total_pages floor-division off-by-one", "signal": "floor|ceil|//|total_pages|partial|undercount|page count"},
+        {"id": "G3", "lens": "reliability", "desc": "sqlite connection never closed", "gating": false, "signal": "connection|close|leak|context manager|finally|with sqlite"}
+      ]
+    },
+    {
+      "name": "tc2-hit-counter",
+      "fixture": "tc2-hit-counter",
+      "target": "counter.py",
+      "branch": "feature/hit-counter",
+      "expect_verdict": "CHANGES_REQUESTED",
+      "planted": [
+        {"id": "G1", "lens": "reliability", "desc": "non-atomic read-modify-write lost-update race", "signal": "race|read-modify-write|lost update|concurren|lock|atomic"}
+      ]
+    }
+  ],
+  "spec_cases": [
+    {
+      "name": "tc3-rate-limiter",
+      "fixture": "tc3-rate-limiter",
+      "doc": "docs/superpowers/specs/rate-limiter-design.md",
+      "expect_verdict": "CHANGES_REQUESTED",
+      "planted": [
+        {"id": "G1", "section": "success criteria", "desc": "no over-limit response contract", "signal": "429|status code|header|retry-after|response body|response contract|over.?limit"},
+        {"id": "G2", "section": "requirements", "desc": "ambiguous 'handle bursts'", "signal": "burst|token bucket|sliding|fixed window|untestable|ambiguous|undefined"},
+        {"id": "G3", "section": "requirements", "desc": "shared-store semantics unspecified", "signal": "shared store|persist|restart|fail.?(open|closed)|atomic|unavailable|consisten"}
+      ]
+    }
+  ]
+}
