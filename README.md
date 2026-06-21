@@ -145,8 +145,8 @@ codex-review-cc/
 │   ├── verify.sh               #   sr_test_cmd
 │   └── stamp.sh                #   sr_stamp_marker
 ├── reference/                  # offline review checklists
-│   ├── security-checklist.txt
-│   └── simplification-checklist.txt
+│   ├── security-checklist.md
+│   └── simplification-checklist.md
 ├── tests/                      # bash unit + install tests (npm test)
 ├── install.sh                  # manual (non-plugin) installer
 └── LICENSE                     # MIT

@@ -13,8 +13,8 @@ C="$DEST/commands/codex"
   && [ -d "$C/helpers" ] \
   && [ -f "$C/helpers/naming.sh" ] \
   && [ -f "$C/helpers/review-payload.sh" ] \
-  && [ -f "$C/reference/security-checklist.txt" ] \
-  && [ -f "$C/reference/simplification-checklist.txt" ] \
+  && [ -f "$C/reference/security-checklist.md" ] \
+  && [ -f "$C/reference/simplification-checklist.md" ] \
   && ok=1
 rm -rf "$DEST"
 if [ "$ok" -eq 1 ]; then echo "install OK"; else echo "install FAIL (rc=$rc)"; exit 1; fi

@@ -249,10 +249,10 @@ assert_eq "test cmd none" "" "$(sr_test_cmd)"
 cd - >/dev/null; rm -rf "$TC"
 
 # --- offline checklists present with expected sections ---
-SC="$ROOT/reference/security-checklist.txt"
+SC="$ROOT/reference/security-checklist.md"
 assert_eq "security checklist exists" "yes" "$([ -f "$SC" ] && echo yes || echo no)"
 assert_eq "security checklist review section" "1" "$([ -f "$SC" ] && grep -c '^## Security Review Checklist' "$SC" || echo 0)"
-MC="$ROOT/reference/simplification-checklist.txt"
+MC="$ROOT/reference/simplification-checklist.md"
 assert_eq "simplification checklist exists" "yes" "$([ -f "$MC" ] && echo yes || echo no)"
 assert_eq "simplification checklist verify section" "1" "$([ -f "$MC" ] && grep -c '^## Verification Checklist' "$MC" || echo 0)"
 

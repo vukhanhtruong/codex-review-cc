@@ -62,7 +62,7 @@ For each iteration K (1..5):
 
 1. Rebuild `PAYLOAD="$(sr_review_payload "$MB")"`. Build the prompt in a temp file
    (never `echo` it): the payload; the contents of BOTH
-   `$CKDIR/security-checklist.txt` and `$CKDIR/simplification-checklist.txt` as review
+   `$CKDIR/security-checklist.md` and `$CKDIR/simplification-checklist.md` as review
    criteria; the `$DEP` line; for K>1/resume, every prior finding by ID (incl. `$PREV_OPEN`) with your
    verdict/rebuttal, requiring Codex to mark each prior ID `resolved|open|superseded`.
    When `$SPEC_DOC`/`$PLAN_DOC` are non-empty, add a line giving those paths and telling Codex to read them (it runs read-only in the repo) for the intended design, and to flag any divergence between the diff and the approved spec/plan as a correctness/spec-compliance finding — reference by path, do not embed their contents.
