@@ -7,6 +7,30 @@
 # rc 0 if JSON-output mode is usable (a JSON parser is on PATH).
 sr_have_json() { command -v node >/dev/null 2>&1; }
 
+# rc 0 if the schema satisfies OpenAI/codex strict structured-output rules: every object
+# with additionalProperties:false must list ALL its property keys in `required` (optional
+# fields are expressed as nullable, not omitted). A schema that violates this makes codex
+# return HTTP 400 invalid_json_schema, which would abort the gate; checking here lets the
+# command stay in markdown mode instead. Defense against schema / provider-strictness drift.
+sr_schema_strict_ok() { # $1 = schema file
+  command -v node >/dev/null 2>&1 || return 1
+  node -e '
+    const fs=require("fs"); let s;
+    try{ s=JSON.parse(fs.readFileSync(process.argv[1],"utf8")); }catch{ process.exit(1); }
+    let ok=true;
+    (function walk(n){
+      if(n&&typeof n==="object"){
+        if(n.type==="object"&&n.properties&&n.additionalProperties===false){
+          const req=Array.isArray(n.required)?n.required:[];
+          for(const k of Object.keys(n.properties)) if(!req.includes(k)) ok=false;
+        }
+        for(const k of Object.keys(n)) walk(n[k]);
+      }
+    })(s);
+    process.exit(ok?0:1);
+  ' "$1"
+}
+
 # Structural contract check. rc 0 ok, rc 1 fail. Rejects: invalid JSON; verdict not in
 # enum; coverage missing any of the 5 lenses (int>=0); findings not an array; a finding
 # id not matching R<n>F<n>; duplicate ids; CHANGES_REQUESTED with zero findings.

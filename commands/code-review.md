@@ -24,11 +24,12 @@ sr_version_ge "${have:-0.0.0}" 0.140.0 || { echo "codex >= 0.140.0 required (hav
 
 # Output mode. JSON (preferred): codex --output-schema returns schema-validated JSON,
 # so structural parsing collapses to one sr_json_validate call — no fragile text grep.
-# Falls back to markdown when no JSON parser (node) or no schema file is present.
+# Falls back to markdown when no JSON parser (node), no schema file, or the schema is
+# not strict-valid for codex (sr_schema_strict_ok) — so a bad schema degrades, not aborts.
 # VFN/RFN/IDFN pick the parser so Phases 1.4/1.5 stay mode-agnostic.
 SCHEMA=""; [ -n "$CKDIR" ] && SCHEMA="$(dirname "$CKDIR")/schemas/review-output.schema.json"
 MODE=markdown; VFN=sr_parse_verdict; RFN=sr_round_findings; IDFN=sr_finding_ids
-if sr_have_json && [ -f "$SCHEMA" ]; then
+if sr_have_json && [ -f "$SCHEMA" ] && sr_schema_strict_ok "$SCHEMA"; then
   MODE=json; VFN=sr_json_verdict; RFN=sr_json_round_findings; IDFN=sr_json_finding_ids
 fi
 
