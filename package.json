@@ -11,6 +11,7 @@
   },
   "keywords": ["claude-code", "claude-code-plugin", "codex", "code-review", "openai"],
   "scripts": {
-    "test": "bash tests/codex-lib.test.sh && bash tests/install.test.sh"
+    "test": "bash tests/codex-lib.test.sh && bash tests/install.test.sh",
+    "evals": "bash evals/run-evals.sh --quality --open"
   }
 }

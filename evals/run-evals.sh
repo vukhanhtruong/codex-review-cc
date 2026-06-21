@@ -20,10 +20,19 @@ SCHEMA="$PLUGIN/schemas/review-output.schema.json"
 GT="$HERE/ground_truth.json"
 FIX="$HERE/fixtures"
 
-WITH_CLAUDE=0; HTML=0; QUALITY=0
+WITH_CLAUDE=0; HTML=0; QUALITY=0; OPEN=0
 for a in "$@"; do case "$a" in
   --with-claude) WITH_CLAUDE=1;; --html) HTML=1;; --quality) QUALITY=1;;
+  --open) HTML=1; OPEN=1;;
 esac; done
+
+open_report() {  # cross-platform best-effort
+  local f="$1"
+  if   command -v xdg-open >/dev/null 2>&1; then xdg-open "$f" >/dev/null 2>&1 &
+  elif command -v open     >/dev/null 2>&1; then open "$f" >/dev/null 2>&1 &
+  elif command -v start    >/dev/null 2>&1; then start "" "$f" >/dev/null 2>&1 &
+  else echo "open it manually: $f"; fi
+}
 command -v codex >/dev/null 2>&1 || { echo "codex CLI not on PATH"; exit 1; }
 have="$(codex --version 2>/dev/null | grep -oE '[0-9]+\.[0-9]+\.[0-9]+' | head -1)"
 sr_version_ge "${have:-0.0.0}" 0.140.0 || { echo "codex >= 0.140.0 required (have ${have:-none})"; exit 1; }
@@ -138,6 +147,7 @@ LABELS=codex; [ "$WITH_CLAUDE" = 1 ] && LABELS=codex,claude
 if [ "$HTML" = 1 ]; then
   python3 "$HERE/grade.py" "$RES" "$GT" --labels "$LABELS" --json "$HERE/results.json"; rc=$?
   python3 "$HERE/report.py" "$HERE/results.json" "$HERE/report.html" $QJSON && echo "HTML report: $HERE/report.html"
+  [ "$OPEN" = 1 ] && open_report "$HERE/report.html"
 else
   python3 "$HERE/grade.py" "$RES" "$GT" --labels "$LABELS"; rc=$?
 fi

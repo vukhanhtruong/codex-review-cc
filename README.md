@@ -174,7 +174,14 @@ deterministic mechanics live in tested `sr_*` helpers behind the `codex-lib.sh` 
 
 ```bash
 npm test        # runs tests/codex-lib.test.sh + tests/install.test.sh
+npm run evals   # runs the eval harness (catch-rate gate + reviewer-quality) and opens report.html
 ```
+
+`npm run evals` builds throwaway sandboxes with planted bugs, runs the commands' Codex
+review against them, and grades the findings — then opens an HTML report. It also runs
+the slower judge-based Codex-vs-Claude-self-review comparison (~9 LLM calls); drop
+`--quality` from the script for a fast gate-only run. Needs `codex`, `node`, `jq`,
+`python3`, and the `claude` CLI. See [`evals/README.md`](evals/README.md).
 
 ## License
 
