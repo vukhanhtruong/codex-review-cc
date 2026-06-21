@@ -1,9 +1,9 @@
-# /codex:code-review — Codex correctness/security/simplification/performance review
+# /codex:code-review — Codex correctness/security/reliability/simplification/performance review
 
 Adversarially review the current branch's implementation diff: a Codex debate over
-correctness, security, simplification, and performance, looping until Codex approves.
-Codex is the hard gate. The command never commits — you do. Mechanics live in tested
-`sr_*` helpers; adjudicating findings and editing code is your (the agent's) job.
+correctness, security, reliability, simplification, and performance, looping until Codex
+approves. Codex is the hard gate. The command never commits — you do. Mechanics live in
+tested `sr_*` helpers; adjudicating findings and editing code is your (the agent's) job.
 
 `$ARGUMENTS` (optional): `[base]` ref to diff against (default `main`).
 
@@ -60,18 +60,41 @@ parse_fail_streak=0
 
 For each iteration K (1..5):
 
-1. Rebuild `PAYLOAD="$(sr_review_payload "$MB")"`. Build the prompt in a temp file
-   (never `echo` it): the payload; the contents of BOTH
-   `$CKDIR/security-checklist.md` and `$CKDIR/simplification-checklist.md` as review
-   criteria; the `$DEP` line; for K>1/resume, every prior finding by ID (incl. `$PREV_OPEN`) with your
-   verdict/rebuttal, requiring Codex to mark each prior ID `resolved|open|superseded`.
-   When `$SPEC_DOC`/`$PLAN_DOC` are non-empty, add a line giving those paths and telling Codex to read them (it runs read-only in the repo) for the intended design, and to flag any divergence between the diff and the approved spec/plan as a correctness/spec-compliance finding — reference by path, do not embed their contents.
-   Review across four lenses — correctness, security, simplification, performance.
-   Required output: each finding headed `## Finding R<K>F<M>` with
-   Lens/File/Severity/Issue/Suggestion and a `STATUS:` line on re-review; **one
-   coverage line per lens** — `LENS correctness: <n findings|none>` and likewise for
-   `security`, `simplification`, `performance`; a single trailing
-   `VERDICT: APPROVED|CHANGES_REQUESTED` line.
+1. Rebuild `PAYLOAD="$(sr_review_payload "$MB")"`. Build the Codex prompt in a temp file
+   (never `echo` it) as **XML-tagged contract blocks** — this structure is the gate's
+   quality lever, so keep the blocks and their intent:
+
+   - `<role>` — Codex is an adversarial reviewer. Its job is to find the strongest
+     reasons this change should *not* ship yet, not to validate it.
+   - `<task>` — review the diff (the `$PAYLOAD`) across **five lenses**: correctness,
+     security, reliability, simplification, performance. Target label: `$BASE...HEAD`.
+   - `<review_criteria>` — inline the contents of ALL THREE checklists as the lens
+     criteria: `$CKDIR/security-checklist.md`, `$CKDIR/reliability-checklist.md`, and
+     `$CKDIR/simplification-checklist.md`. Add the `$DEP` dependency-audit line.
+   - `<design_context>` — when `$SPEC_DOC`/`$PLAN_DOC` are non-empty, give those paths
+     and tell Codex to read them read-only (it runs read-only in the repo) for the
+     intended design, and to flag any divergence between the diff and the approved
+     spec/plan as a correctness/spec-compliance finding. Reference by path; do NOT embed
+     their contents.
+   - `<prior_findings>` — for K>1/resume, list every prior finding by ID (incl.
+     `$PREV_OPEN`) with your verdict/rebuttal, requiring Codex to mark each prior ID
+     `resolved|open|superseded`.
+   - `<grounding_rules>` — every finding must be defensible from the diff or a tool
+     output. Do NOT invent files, lines, code paths, or runtime behavior. If a
+     conclusion rests on inference, say so and keep confidence honest. (A fabricated
+     finding wastes a debate round.)
+   - `<finding_bar>` — report only material findings; no style/naming nits or
+     speculative concerns without evidence. Each finding answers: what can go wrong, why
+     this path is vulnerable, the likely impact, and the concrete fix.
+   - `<calibration_rules>` — prefer one strong finding over several weak ones; do NOT
+     manufacture findings to fill a lens; mark a clean lens `none`. Approve only when no
+     substantive finding remains.
+   - `<output_contract>` — each finding headed `## Finding R<K>F<M>` with
+     Lens/File/Line/Severity/Confidence/Issue/Suggestion (Line as `start-end`,
+     Confidence 0–1) and a `STATUS:` line on re-review; **exactly one coverage line per
+     lens** — `LENS correctness: <n findings|none>` and likewise for `security`,
+     `reliability`, `simplification`, `performance`; a single trailing
+     `VERDICT: APPROVED|CHANGES_REQUESTED` line as the last non-empty line.
 2. Run Codex under a timeout, capturing output + rc:
 
    ```bash
@@ -92,7 +115,7 @@ For each iteration K (1..5):
    hdrs="$(grep -cE '^## Finding' "$roundfile")"
    goodids="$(sr_finding_ids "$roundfile" | grep -cE '^R[0-9]+F[0-9]+$')"
    # each lens must have EXACTLY one coverage line
-   lens_ok=1; for L in correctness security simplification performance; do
+   lens_ok=1; for L in correctness security reliability simplification performance; do
      [ "$(grep -ciE "^LENS ${L}:" "$roundfile")" -eq 1 ] || lens_ok=0
    done
    # parse failure = malformed verdict, duplicate IDs, malformed/missing finding ID,

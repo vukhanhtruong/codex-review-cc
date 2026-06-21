@@ -255,6 +255,9 @@ assert_eq "security checklist review section" "1" "$([ -f "$SC" ] && grep -c '^#
 MC="$ROOT/reference/simplification-checklist.md"
 assert_eq "simplification checklist exists" "yes" "$([ -f "$MC" ] && echo yes || echo no)"
 assert_eq "simplification checklist verify section" "1" "$([ -f "$MC" ] && grep -c '^## Verification Checklist' "$MC" || echo 0)"
+RC="$ROOT/reference/reliability-checklist.md"
+assert_eq "reliability checklist exists" "yes" "$([ -f "$RC" ] && echo yes || echo no)"
+assert_eq "reliability checklist review section" "1" "$([ -f "$RC" ] && grep -c '^## Reliability Review Checklist' "$RC" || echo 0)"
 
 # --- code-review.md bash blocks must parse ---
 CR="$ROOT/commands/code-review.md"

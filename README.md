@@ -94,18 +94,20 @@ stamps `codex-approved <date>` into the doc's frontmatter — a durable marker.
 ```
 
 Reviews the committed diff + working-tree diff + untracked file contents (rebuilt each
-round so your edits stay in view), against the **security** and **simplification**
-checklists shipped in `reference/`, plus correctness and performance lenses. Secrets
-are redacted from the payload by filename and by content. When a spec/plan doc is
-found for the branch, Codex reads it read-only and flags any diff-vs-design divergence.
-Runs your test command at approval so it never green-lights a broken build. Loop cap: 5
-rounds.
+round so your edits stay in view) across **five lenses** — correctness, security,
+reliability, simplification, performance — driven by the **security**, **reliability**,
+and **simplification** checklists shipped in `reference/`. The Codex prompt is built as
+XML contract blocks (grounding, finding-bar, calibration) so findings stay grounded and
+noise-free. Secrets are redacted from the payload by filename and by content. When a
+spec/plan doc is found for the branch, Codex reads it read-only and flags any
+diff-vs-design divergence. Runs your test command at approval so it never green-lights a
+broken build. Loop cap: 5 rounds.
 
 ## The debate, briefly
 
-Each round Codex emits findings (`## Finding R<K>F<M>` with Lens/File/Severity/Issue/
-Suggestion) and a single `VERDICT: APPROVED | CHANGES_REQUESTED`. For every open
-finding Claude renders one of:
+Each round Codex emits findings (`## Finding R<K>F<M>` with Lens/File/Line/Severity/
+Confidence/Issue/Suggestion) and a single `VERDICT: APPROVED | CHANGES_REQUESTED`. For
+every open finding Claude renders one of:
 
 - **AGREE / PARTIAL** → edit code/doc, then re-verify.
 - **DISAGREE** → no edit; a rebuttal feeds into the next round.
@@ -146,6 +148,7 @@ codex-review-cc/
 │   └── stamp.sh                #   sr_stamp_marker
 ├── reference/                  # offline review checklists
 │   ├── security-checklist.md
+│   ├── reliability-checklist.md
 │   └── simplification-checklist.md
 ├── tests/                      # bash unit + install tests (npm test)
 ├── install.sh                  # manual (non-plugin) installer

@@ -14,6 +14,7 @@ C="$DEST/commands/codex"
   && [ -f "$C/helpers/naming.sh" ] \
   && [ -f "$C/helpers/review-payload.sh" ] \
   && [ -f "$C/reference/security-checklist.md" ] \
+  && [ -f "$C/reference/reliability-checklist.md" ] \
   && [ -f "$C/reference/simplification-checklist.md" ] \
   && ok=1
 rm -rf "$DEST"
