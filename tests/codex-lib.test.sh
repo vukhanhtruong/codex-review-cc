@@ -399,5 +399,44 @@ else
   assert_eq "non-bash guard (sh is bash; functional test skipped)" skip skip
 fi
 
+# --- #3: JSON-output mode (helpers/json-output.sh) ---
+SCHEMA="$ROOT/schemas/review-output.schema.json"
+assert_eq "schema file exists" "yes" "$([ -f "$SCHEMA" ] && echo yes || echo no)"
+if command -v node >/dev/null 2>&1; then
+  assert_eq "schema parses as JSON" "ok" "$(node -e 'JSON.parse(require("fs").readFileSync(process.argv[1],"utf8"))' "$SCHEMA" >/dev/null 2>&1 && echo ok || echo bad)"
+  assert_rc "sr_have_json true when node present" 0 "$(sr_have_json; echo $?)"
+  JT="$(mktemp)"
+  COV='"coverage":{"correctness":0,"security":0,"reliability":0,"simplification":0,"performance":0}'
+  # valid APPROVED, no findings
+  printf '{"verdict":"APPROVED","summary":"ok",%s,"findings":[]}' "$COV" > "$JT"
+  assert_rc "validate APPROVED empty ok" 0 "$(sr_json_validate "$JT"; echo $?)"
+  assert_eq "verdict APPROVED" "APPROVED" "$(sr_json_verdict "$JT")"
+  # valid CHANGES_REQUESTED with one finding
+  printf '{"verdict":"CHANGES_REQUESTED","summary":"x",%s,"findings":[{"id":"R1F1","lens":"security","file":"a.js","line_start":1,"line_end":2,"severity":"high","confidence":0.9,"issue":"i","suggestion":"s","status":"open"}]}' "$COV" > "$JT"
+  assert_rc "validate CHANGES with finding ok" 0 "$(sr_json_validate "$JT"; echo $?)"
+  assert_eq "round findings id+status" "R1F1 open" "$(sr_json_round_findings "$JT")"
+  assert_eq "finding ids" "R1F1" "$(sr_json_finding_ids "$JT")"
+  # reject: invalid JSON
+  printf 'not json' > "$JT"; assert_rc "validate rejects bad json" 1 "$(sr_json_validate "$JT"; echo $?)"
+  # reject: bad verdict
+  printf '{"verdict":"MAYBE","summary":"x",%s,"findings":[]}' "$COV" > "$JT"
+  assert_rc "validate rejects bad verdict" 1 "$(sr_json_validate "$JT"; echo $?)"
+  # reject: missing a lens in coverage
+  printf '{"verdict":"APPROVED","summary":"x","coverage":{"correctness":0,"security":0,"reliability":0,"simplification":0},"findings":[]}' > "$JT"
+  assert_rc "validate rejects missing lens" 1 "$(sr_json_validate "$JT"; echo $?)"
+  # reject: CHANGES_REQUESTED with no findings
+  printf '{"verdict":"CHANGES_REQUESTED","summary":"x",%s,"findings":[]}' "$COV" > "$JT"
+  assert_rc "validate rejects changes+empty" 1 "$(sr_json_validate "$JT"; echo $?)"
+  # reject: duplicate finding id
+  printf '{"verdict":"CHANGES_REQUESTED","summary":"x",%s,"findings":[{"id":"R1F1","lens":"security","file":"a","line_start":1,"line_end":1,"severity":"low","confidence":0.1,"issue":"i","suggestion":"s"},{"id":"R1F1","lens":"correctness","file":"b","line_start":1,"line_end":1,"severity":"low","confidence":0.1,"issue":"i","suggestion":"s"}]}' "$COV" > "$JT"
+  assert_rc "validate rejects dup id" 1 "$(sr_json_validate "$JT"; echo $?)"
+  # reject: malformed finding id
+  printf '{"verdict":"CHANGES_REQUESTED","summary":"x",%s,"findings":[{"id":"bad","lens":"security","file":"a","line_start":1,"line_end":1,"severity":"low","confidence":0.1,"issue":"i","suggestion":"s"}]}' "$COV" > "$JT"
+  assert_rc "validate rejects malformed id" 1 "$(sr_json_validate "$JT"; echo $?)"
+  rm -f "$JT"
+else
+  assert_eq "JSON helper tests (no node; skipped)" skip skip
+fi
+
 printf '\n%d passed, %d failed\n' "$pass" "$fail"
 [ "$fail" -eq 0 ]

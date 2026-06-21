@@ -16,6 +16,7 @@ C="$DEST/commands/codex"
   && [ -f "$C/reference/security-checklist.md" ] \
   && [ -f "$C/reference/reliability-checklist.md" ] \
   && [ -f "$C/reference/simplification-checklist.md" ] \
+  && [ -f "$C/schemas/review-output.schema.json" ] \
   && ok=1
 rm -rf "$DEST"
 if [ "$ok" -eq 1 ]; then echo "install OK"; else echo "install FAIL (rc=$rc)"; exit 1; fi

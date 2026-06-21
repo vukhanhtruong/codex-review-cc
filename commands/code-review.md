@@ -22,6 +22,16 @@ command -v codex >/dev/null 2>&1 || { echo "codex CLI not on PATH"; exit 1; }
 have="$(codex --version 2>/dev/null | grep -oE '[0-9]+\.[0-9]+\.[0-9]+' | head -1)"
 sr_version_ge "${have:-0.0.0}" 0.140.0 || { echo "codex >= 0.140.0 required (have ${have:-none})"; exit 1; }
 
+# Output mode. JSON (preferred): codex --output-schema returns schema-validated JSON,
+# so structural parsing collapses to one sr_json_validate call — no fragile text grep.
+# Falls back to markdown when no JSON parser (node) or no schema file is present.
+# VFN/RFN/IDFN pick the parser so Phases 1.4/1.5 stay mode-agnostic.
+SCHEMA=""; [ -n "$CKDIR" ] && SCHEMA="$(dirname "$CKDIR")/schemas/review-output.schema.json"
+MODE=markdown; VFN=sr_parse_verdict; RFN=sr_round_findings; IDFN=sr_finding_ids
+if sr_have_json && [ -f "$SCHEMA" ]; then
+  MODE=json; VFN=sr_json_verdict; RFN=sr_json_round_findings; IDFN=sr_json_finding_ids
+fi
+
 # args: token 1 = base ref (default main); token 2 = optional design-doc name hint
 set -f; set -- ${ARGUMENTS:-}; set +f
 BASE="${1:-main}"
@@ -42,6 +52,7 @@ LOG="$(sr_log_path "${REPO}-$(sr_root_hash)" "$(sr_sanitize_name "$BRANCH")")"
 LOG="${LOG/spec-review-/codex-review-}"   # code-review log namespace
 DEP="$(sr_audit_summary)"
 echo "Scope:  $BASE...HEAD ($BRANCH)"
+echo "Mode:   $MODE"
 echo "Log:    $LOG"
 echo "Design: ${SPEC_DOC:-(none)} | ${PLAN_DOC:-(none)}"
 echo "$DEP"
@@ -87,41 +98,62 @@ For each iteration K (1..5):
      speculative concerns without evidence. Each finding answers: what can go wrong, why
      this path is vulnerable, the likely impact, and the concrete fix.
    - `<calibration_rules>` — prefer one strong finding over several weak ones; do NOT
-     manufacture findings to fill a lens; mark a clean lens `none`. Approve only when no
-     substantive finding remains.
-   - `<output_contract>` — each finding headed `## Finding R<K>F<M>` with
-     Lens/File/Line/Severity/Confidence/Issue/Suggestion (Line as `start-end`,
-     Confidence 0–1) and a `STATUS:` line on re-review; **exactly one coverage line per
-     lens** — `LENS correctness: <n findings|none>` and likewise for `security`,
-     `reliability`, `simplification`, `performance`; a single trailing
-     `VERDICT: APPROVED|CHANGES_REQUESTED` line as the last non-empty line.
-2. Run Codex under a timeout, capturing output + rc:
+     manufacture findings to fill a lens; a clean lens gets coverage `0`. Approve only
+     when no substantive finding remains.
+   - `<output_contract>` — depends on `$MODE`:
+     - **json** — return ONLY JSON conforming to the schema at `$SCHEMA` (no prose,
+       no fences). `verdict` ∈ `APPROVED|CHANGES_REQUESTED`; `coverage` has an integer
+       count for all five lenses; each `findings[]` entry has
+       `id` (`R<K>F<M>`), `lens`, `file`, `line_start`, `line_end`, `severity`,
+       `confidence` (0–1), `issue`, `suggestion`, and on re-review a `status`
+       (`resolved|open|superseded`).
+     - **markdown** — each finding headed `## Finding R<K>F<M>` with
+       Lens/File/Line/Severity/Confidence/Issue/Suggestion (Line `start-end`,
+       Confidence 0–1) and a `STATUS:` line on re-review; **exactly one coverage line
+       per lens** — `LENS correctness: <n findings|none>` and likewise for `security`,
+       `reliability`, `simplification`, `performance`; a single trailing
+       `VERDICT: APPROVED|CHANGES_REQUESTED` line as the last non-empty line.
+2. Run Codex under a timeout, capturing output + rc. In JSON mode the schema is enforced
+   by codex and the final message (the JSON) is written with `-o`:
 
    ```bash
    roundfile="$(mktemp)"; errfile="$(mktemp)"
-   timeout 600 codex exec --sandbox read-only --ephemeral - < "$promptfile" >"$roundfile" 2>"$errfile"; rc=$?
-   { echo "=== CODE REVIEW · iteration $K · $(date +'%F %T') ==="; cat "$roundfile" "$errfile"; } >> "$LOG"
+   if [ "$MODE" = json ]; then
+     timeout 600 codex exec --sandbox read-only --ephemeral --output-schema "$SCHEMA" -o "$roundfile" - < "$promptfile" >/dev/null 2>"$errfile"; rc=$?
+   else
+     timeout 600 codex exec --sandbox read-only --ephemeral - < "$promptfile" >"$roundfile" 2>"$errfile"; rc=$?
+   fi
+   { echo "=== CODE REVIEW · iteration $K · $MODE · $(date +'%F %T') ==="; cat "$roundfile" "$errfile"; } >> "$LOG"
    if [ "$rc" -ne 0 ] || [ ! -s "$roundfile" ]; then
      echo "codex failed (rc=$rc) or empty output — NOT approved; see $LOG"; exit 1
    fi
    ```
-3. Parse the verdict with the fail-closed counter:
+3. Parse the verdict with the fail-closed counter. **JSON mode** — one structural check
+   (`sr_json_validate` rejects bad JSON, a bad/missing verdict, a missing lens in
+   `coverage`, a malformed or duplicate finding id, and CHANGES_REQUESTED with no
+   findings):
 
    ```bash
-   verdict="$(sr_parse_verdict "$roundfile")" || true
-   dups="$(sr_finding_ids "$roundfile" | sort | uniq -d)"
-   ids="$(sr_finding_ids "$roundfile")"
-   # malformed finding header: any "## Finding" line whose ID isn't R<K>F<M>
-   hdrs="$(grep -cE '^## Finding' "$roundfile")"
-   goodids="$(sr_finding_ids "$roundfile" | grep -cE '^R[0-9]+F[0-9]+$')"
-   # each lens must have EXACTLY one coverage line
-   lens_ok=1; for L in correctness security reliability simplification performance; do
-     [ "$(grep -ciE "^LENS ${L}:" "$roundfile")" -eq 1 ] || lens_ok=0
-   done
-   # parse failure = malformed verdict, duplicate IDs, malformed/missing finding ID,
-   # a missing/duplicated lens line, OR changes-requested with no parseable findings
-   if [ "$verdict" = "PARSE_FAIL" ] || [ -n "$dups" ] || [ "$hdrs" -ne "$goodids" ] \
-      || [ "$lens_ok" -eq 0 ] || { [ "$verdict" = "CHANGES_REQUESTED" ] && [ -z "$ids" ]; }; then
+   if [ "$MODE" = json ]; then
+     if sr_json_validate "$roundfile"; then verdict="$(sr_json_verdict "$roundfile")"; else verdict=PARSE_FAIL; fi
+     ids="$("$IDFN" "$roundfile")"
+   else
+     # markdown mode: the same guarantees, reconstructed from text
+     verdict="$(sr_parse_verdict "$roundfile")" || true
+     dups="$(sr_finding_ids "$roundfile" | sort | uniq -d)"
+     ids="$(sr_finding_ids "$roundfile")"
+     hdrs="$(grep -cE '^## Finding' "$roundfile")"
+     goodids="$(sr_finding_ids "$roundfile" | grep -cE '^R[0-9]+F[0-9]+$')"
+     lens_ok=1; for L in correctness security reliability simplification performance; do
+       [ "$(grep -ciE "^LENS ${L}:" "$roundfile")" -eq 1 ] || lens_ok=0
+     done
+     if [ "$verdict" = "PARSE_FAIL" ] || [ -n "$dups" ] || [ "$hdrs" -ne "$goodids" ] \
+        || [ "$lens_ok" -eq 0 ] || { [ "$verdict" = "CHANGES_REQUESTED" ] && [ -z "$ids" ]; }; then
+       verdict=PARSE_FAIL
+     fi
+   fi
+   # shared fail-closed handling: two parse failures in a row aborts
+   if [ "$verdict" = "PARSE_FAIL" ]; then
      parse_fail_streak=$((parse_fail_streak + 1))
      if [ "$parse_fail_streak" -ge 2 ]; then
        echo "two consecutive parse failures (bad verdict / duplicate / missing IDs) — aborting; see $LOG"; exit 1
@@ -136,7 +168,7 @@ For each iteration K (1..5):
    ```bash
    # every id in $PREV_OPEN must be resolved|superseded in this round, else not approved
    accounted=1
-   this_round="$(sr_round_findings "$roundfile")"
+   this_round="$("$RFN" "$roundfile")"
    for id in $PREV_OPEN; do
      st="$(printf '%s\n' "$this_round" | awk -v i="$id" '$1==i{print $2}' | tail -1)"
      case "$st" in resolved|superseded) ;; *) accounted=0 ;; esac
@@ -156,8 +188,10 @@ For each iteration K (1..5):
      verdict=CHANGES_REQUESTED   # fall through to adjudication
    fi
    ```
-5. **If not approved** — from `sr_round_findings "$roundfile"`, act only on findings
-   with `STATUS=open` or NEW (no `resolved|superseded`); skip closed ones. For each:
+5. **If not approved** — from `"$RFN" "$roundfile"`, act only on findings with
+   `STATUS=open` or NEW (no `resolved|superseded`); skip closed ones. Use the finding
+   bodies (markdown sections, or JSON fields via `sr_json_table`) for the issue detail.
+   For each:
    - **AGREE/PARTIAL** → edit the code, then **verify** (Phase 1.5).
    - **Behavior/scope change beyond the diff's intent** → do NOT edit; halt, return the
      proposed change + finding ID for confirmation; the user re-invokes to resume.
@@ -187,8 +221,9 @@ verdict over a broken build. If no command is discoverable, the result is report
 ## Terminate
 
 - **APPROVED** (prior IDs accounted; verification ran or reported absent) → report a
-  summary: the `$DEP` line, the per-finding table
-  (id · severity · lens · verdict · action), the verification result, the Codex verdict,
-  and the log path. Relay: "Code review passed — proceed to finish the branch." Never commits.
+  summary: the `$DEP` line, the per-finding table (id · lens · severity · confidence ·
+  file:line · verdict · action — `sr_json_table` gives the JSON-mode rows), the
+  verification result, the Codex verdict, and the log path. Relay: "Code review passed —
+  proceed to finish the branch." Never commits.
 - **Cap hit / failure / halted** → report the unresolved finding IDs (latest `FINDING`
   block via `sr_open_findings`) + log path; NOT approved. Re-invoking resumes.

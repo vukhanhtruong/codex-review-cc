@@ -15,6 +15,9 @@ command ever commits.
 - The [`codex` CLI](https://github.com/openai/codex) on `PATH`, **version ≥ 0.140.0**
   (both commands preflight-check this).
 - Run from inside a git repo.
+- *Optional:* `node` on `PATH` enables **structured JSON mode** for `/codex:code-review`
+  (`codex --output-schema`). Without it the command falls back to markdown parsing —
+  same gate, slightly more fragile.
 - Codex runs `codex exec --sandbox read-only --ephemeral` — it reads the repo but
   never writes. All edits come from Claude.
 
@@ -103,6 +106,12 @@ spec/plan doc is found for the branch, Codex reads it read-only and flags any
 diff-vs-design divergence. Runs your test command at approval so it never green-lights a
 broken build. Loop cap: 5 rounds.
 
+When `node` is available, Codex returns **schema-validated JSON**
+(`schemas/review-output.schema.json`) and the round is checked by a single
+`sr_json_validate` call instead of text parsing — findings carry real `line_start`/
+`line_end` + `confidence` numbers for triage. Without `node`, the same contract is
+parsed from markdown.
+
 ## The debate, briefly
 
 Each round Codex emits findings (`## Finding R<K>F<M>` with Lens/File/Line/Severity/
@@ -145,11 +154,14 @@ codex-review-cc/
 │   ├── log-identity.sh         #   sr_log_path, sr_root_hash
 │   ├── dep-audit.sh            #   sr_audit_summary
 │   ├── verify.sh               #   sr_test_cmd
-│   └── stamp.sh                #   sr_stamp_marker
+│   ├── stamp.sh                #   sr_stamp_marker
+│   └── json-output.sh          #   sr_have_json, sr_json_validate/verdict/round_findings
 ├── reference/                  # offline review checklists
 │   ├── security-checklist.md
 │   ├── reliability-checklist.md
 │   └── simplification-checklist.md
+├── schemas/
+│   └── review-output.schema.json  # JSON-mode review contract (codex --output-schema)
 ├── tests/                      # bash unit + install tests (npm test)
 ├── install.sh                  # manual (non-plugin) installer
 └── LICENSE                     # MIT
