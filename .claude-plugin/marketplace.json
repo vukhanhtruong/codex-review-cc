@@ -1,0 +1,16 @@
+{
+  "name": "codex-review-cc",
+  "owner": {
+    "name": "Khanh Truong Vu",
+    "email": "vukhanhtruong@gmail.com"
+  },
+  "plugins": [
+    {
+      "name": "codex",
+      "source": "./",
+      "description": "Adversarial OpenAI Codex review for specs/plans and branch diffs. Provides /codex:code-review and /codex:spec-review.",
+      "version": "1.0.0",
+      "license": "MIT"
+    }
+  ]
+}

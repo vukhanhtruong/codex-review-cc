@@ -1,0 +1,13 @@
+{
+  "name": "codex",
+  "version": "1.0.0",
+  "description": "Summon OpenAI Codex as an adversarial reviewer of specs/plans and branch diffs, then debate it to convergence. Codex is the hard gate; it never commits.",
+  "author": {
+    "name": "Khanh Truong Vu",
+    "email": "vukhanhtruong@gmail.com"
+  },
+  "homepage": "https://github.com/vukhanhtruong/codex-review-cc",
+  "repository": "https://github.com/vukhanhtruong/codex-review-cc",
+  "license": "MIT",
+  "keywords": ["codex", "code-review", "spec-review", "openai", "adversarial-review"]
+}

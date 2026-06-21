@@ -1,0 +1,16 @@
+{
+  "name": "codex-review-cc",
+  "version": "1.0.0",
+  "description": "Adversarial OpenAI Codex review for Claude Code: /codex:code-review and /codex:spec-review, debating Codex to convergence as a hard gate.",
+  "license": "MIT",
+  "author": "Khanh Truong Vu <vukhanhtruong@gmail.com>",
+  "homepage": "https://github.com/vukhanhtruong/codex-review-cc",
+  "repository": {
+    "type": "git",
+    "url": "git+https://github.com/vukhanhtruong/codex-review-cc.git"
+  },
+  "keywords": ["claude-code", "claude-code-plugin", "codex", "code-review", "openai"],
+  "scripts": {
+    "test": "bash tests/codex-lib.test.sh && bash tests/install.test.sh"
+  }
+}
